@@ -1,9 +1,9 @@
+import time
 from collections import defaultdict, deque
-
 
 class My_NFA:
     def __init__(self):
-        self.all_effects = [
+        self.all_effects = ['Nothing',
             'Anti-Gravity', 'Athletic', 'Balding', 'Bright-Eyed', 'Calming', 'Calorie-Dense',
             'Cyclopean', 'Disorienting', 'Electrifying', 'Energizing', 'Euphoric', 'Explosive',
             'Focused', 'Foggy', 'Gingeritis', 'Glowing', 'Jennerising', 'Laxative', 'LongFaced',
@@ -188,6 +188,8 @@ class My_NFA:
         return self.all_effects
 
     def find_shortest_path_from_specific_initial(self, initial_effects, target_effects):
+        start_time = time.time()  # Record the start time
+
         initial = frozenset(initial_effects)
         target_set = set(target_effects)
 
@@ -199,6 +201,10 @@ class My_NFA:
         visited.add(initial)
 
         while queue:
+            # Check if 3 seconds have passed
+            if time.time() - start_time > 3:
+                break
+
             current_state, path = queue.popleft()
 
             # Check if the current state meets target
@@ -234,12 +240,12 @@ class My_NFA:
 
 
 # Run all tests
-if __name__ == "__main__":
-
-    nfa = My_NFA()
-    path, sides = nfa.find_shortest_path_from_specific_initial(
-        initial_effects={"Energizing"},
-        target_effects={ "Euphoric", "Energizing"}
-    )
-    # Energizing + Banana -> (Thought-Provoking, Gingeritis) + Gasoline -> (Thought-Provoking, Toxic
-    print(path, sides)
+# if __name__ == "__main__":
+#
+#     nfa = My_NFA()
+#     path, sides = nfa.find_shortest_path_from_specific_initial(
+#         initial_effects={"Energizing"},
+#         target_effects={ "Euphoric", "Energizing"}
+#     )
+#     # Energizing + Banana -> (Thought-Provoking, Gingeritis) + Gasoline -> (Thought-Provoking, Toxic
+#     print(path, sides)

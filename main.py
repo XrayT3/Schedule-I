@@ -32,6 +32,28 @@ class BotHandler:
         )
         return SELECT_INITIAL
 
+    async def restart(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+        """Restart the conversation after clicking the restart button"""
+        query = update.callback_query
+        await query.answer()
+
+        # Clear and reinitialize user data
+        context.user_data.clear()
+        context.user_data.update({
+            'initial': set(),
+            'target': set(),
+            'page': 0,
+            'current_state': SELECT_INITIAL
+        })
+
+        # Edit the current message instead of sending a new one
+        await query.edit_message_text(
+            "🧪 Alchemy Bot 🧪\n\nFirst, select effects you CURRENTLY HAVE:",
+            reply_markup=self.create_effects_keyboard(context)
+        )
+
+        return SELECT_INITIAL
+
     def create_effects_keyboard(self, context, page=None):
         """Create paginated keyboard with effects"""
         if page is None:
@@ -39,7 +61,7 @@ class BotHandler:
 
         effects = self.nfa.get_all_effects()
         keyboard = []
-        per_page = 8
+        per_page = 9
         start = page * per_page
         end = start + per_page
 
@@ -74,7 +96,7 @@ class BotHandler:
 
         # Handle restart
         if data == "restart":
-            return await self.start(update, context)
+            return await self.restart(update, context)
 
         # Handle state transitions
         current_state = context.user_data['current_state']
@@ -143,11 +165,15 @@ class BotHandler:
             else:
                 response.append("\n🍃 No side effects!")
 
+        # Create restart button keyboard
+        keyboard = [[InlineKeyboardButton("🔄 Restart", callback_data="restart")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
 
         await query.edit_message_text(
-            text="\n".join(response)
+            text="\n".join(response),
+            reply_markup=reply_markup  # Add the keyboard to the message
         )
-        return ConversationHandler.END
+        # return ConversationHandler.END
 
     def get_handlers(self):
         return [
@@ -160,12 +186,12 @@ class BotHandler:
                 fallbacks=[],
                 map_to_parent={ConversationHandler.END: ConversationHandler.END}
             ),
-            CallbackQueryHandler(self.handle_interaction, pattern="^restart$")
+            CallbackQueryHandler(self.restart, pattern="^restart$")
         ]
 
 
 def main():
-    application = Application.builder().token("").build()
+    application = Application.builder().token("585685733:AAHB2rj0F-6ohw3_tlxa0O1D4YgQzaq2dYE").build()
     handler = BotHandler()
     application.add_handlers(handler.get_handlers())
     application.run_polling()
