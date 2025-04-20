@@ -15,6 +15,8 @@ SELECT_INITIAL, SELECT_TARGET = range(2)
 class BotHandler:
     def __init__(self):
         self.nfa = My_NFA()
+        # Add this to track active conversations
+        self.active_conversations = set()
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         """Initialize a new session"""
@@ -184,7 +186,8 @@ class BotHandler:
                     SELECT_TARGET: [CallbackQueryHandler(self.handle_interaction)]
                 },
                 fallbacks=[],
-                map_to_parent={ConversationHandler.END: ConversationHandler.END}
+                map_to_parent={ConversationHandler.END: ConversationHandler.END},
+                allow_reentry=True
             ),
             CallbackQueryHandler(self.restart, pattern="^restart$")
         ]
@@ -193,6 +196,7 @@ class BotHandler:
 def main():
     application = Application.builder().token("").build()
     handler = BotHandler()
+
     application.add_handlers(handler.get_handlers())
     application.run_polling()
 

@@ -191,7 +191,7 @@ class My_NFA:
         start_time = time.time()  # Record the start time
 
         initial = frozenset(initial_effects)
-        target_set = set(target_effects)
+        target_set = set(target_effects) - {'Nothing'}
 
         if target_set.issubset(initial):
             return [], set(initial) - target_set - {'Nothing'}
