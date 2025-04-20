@@ -15,8 +15,6 @@ SELECT_INITIAL, SELECT_TARGET = range(2)
 class BotHandler:
     def __init__(self):
         self.nfa = My_NFA()
-        # Add this to track active conversations
-        self.active_conversations = set()
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         """Initialize a new session"""
