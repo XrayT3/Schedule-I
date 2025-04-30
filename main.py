@@ -12,34 +12,89 @@ logger = logging.getLogger(__name__)
 SELECT_MODE, SELECT_INITIAL, SELECT_TARGET, SELECT_MAX_TIME, SELECT_BUDGET = range(5)
 
 
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Initialize a new session and ask user which mode they want to use"""
+    context.user_data.clear()
+    context.user_data.update({
+        'initial': set(),
+        'target': set(),
+        'page': 0,
+        'current_state': SELECT_MODE,  # Changed initial state to mode selection
+        'max_time': 10,  # Default value
+        'budget': 50.0,  # Default value
+    })
+
+    # Create keyboard for mode selection
+    keyboard = [
+        [InlineKeyboardButton("🧪 Find Recipe", callback_data="mode_recipe")],
+        [InlineKeyboardButton("💰 Maximize Price", callback_data="mode_knapsack")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text(
+        "🧪 Alchemy Bot 🧪\n\nChoose operation mode:",
+        reply_markup=reply_markup
+    )
+    return SELECT_MODE
+
+
+async def restart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Restart the conversation after clicking the restart button"""
+    query = update.callback_query
+    await query.answer()
+
+    # Clear and reinitialize user data
+    context.user_data.clear()
+    context.user_data.update({
+        'initial': set(),
+        'target': set(),
+        'page': 0,
+        'current_state': SELECT_MODE,  # Changed to mode selection
+        'max_time': 10,  # Default value
+        'budget': 50.0,  # Default value
+    })
+
+    # Create keyboard for mode selection
+    keyboard = [
+        [InlineKeyboardButton("🧪 Find Recipe", callback_data="mode_recipe")],
+        [InlineKeyboardButton("💰 Maximize Price", callback_data="mode_knapsack")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    # Edit the current message instead of sending a new one
+    await query.edit_message_text(
+        "🧪 Alchemy Bot 🧪\n\nChoose operation mode:",
+        reply_markup=reply_markup
+    )
+
+    return SELECT_MODE
+
+
+def create_max_time_keyboard():
+    """Create keyboard for max_time selection"""
+    keyboard = [
+        [InlineKeyboardButton("3 seconds", callback_data="time_3")],
+        [InlineKeyboardButton("10 seconds", callback_data="time_10")],
+        [InlineKeyboardButton("30 seconds", callback_data="time_30")],
+        [InlineKeyboardButton("60 seconds", callback_data="time_60")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
+def create_budget_keyboard():
+    """Create keyboard for budget selection"""
+    keyboard = [
+        [InlineKeyboardButton("$5", callback_data="budget_5")],
+        [InlineKeyboardButton("$15", callback_data="budget_15")],
+        [InlineKeyboardButton("$50", callback_data="budget_50")],
+        [InlineKeyboardButton("$100", callback_data="budget_100")]
+    ]
+    return InlineKeyboardMarkup(keyboard)
+
+
 class BotHandler:
     def __init__(self):
         self.nfa = My_NFA()
-
-    async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-        """Initialize a new session and ask user which mode they want to use"""
-        context.user_data.clear()
-        context.user_data.update({
-            'initial': set(),
-            'target': set(),
-            'page': 0,
-            'current_state': SELECT_MODE,  # Changed initial state to mode selection
-            'max_time': 10,  # Default value
-            'budget': 50.0,  # Default value
-        })
-
-        # Create keyboard for mode selection
-        keyboard = [
-            [InlineKeyboardButton("🧪 Find Recipe", callback_data="mode_recipe")],
-            [InlineKeyboardButton("💰 Maximize Price", callback_data="mode_knapsack")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        await update.message.reply_text(
-            "🧪 Alchemy Bot 🧪\n\nChoose operation mode:",
-            reply_markup=reply_markup
-        )
-        return SELECT_MODE
 
     async def select_mode(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int | None:
         """Handle mode selection"""
@@ -65,37 +120,6 @@ class BotHandler:
             context.user_data['current_state'] = SELECT_INITIAL
             return SELECT_INITIAL
 
-    async def restart(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-        """Restart the conversation after clicking the restart button"""
-        query = update.callback_query
-        await query.answer()
-
-        # Clear and reinitialize user data
-        context.user_data.clear()
-        context.user_data.update({
-            'initial': set(),
-            'target': set(),
-            'page': 0,
-            'current_state': SELECT_MODE,  # Changed to mode selection
-            'max_time': 10,  # Default value
-            'budget': 50.0,  # Default value
-        })
-
-        # Create keyboard for mode selection
-        keyboard = [
-            [InlineKeyboardButton("🧪 Find Recipe", callback_data="mode_recipe")],
-            [InlineKeyboardButton("💰 Maximize Price", callback_data="mode_knapsack")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-
-        # Edit the current message instead of sending a new one
-        await query.edit_message_text(
-            "🧪 Alchemy Bot 🧪\n\nChoose operation mode:",
-            reply_markup=reply_markup
-        )
-
-        return SELECT_MODE
-
     def create_effects_keyboard(self, context, page=None):
         """Create paginated keyboard with effects"""
         if page is None:
@@ -104,8 +128,8 @@ class BotHandler:
         effects = self.nfa.get_all_effects()
         keyboard = []
         per_page = 9
-        start = page * per_page
-        end = start + per_page
+        first = page * per_page
+        last = first + per_page
 
         # Add effect buttons
         current_state = context.user_data['current_state']
@@ -113,7 +137,7 @@ class BotHandler:
         # if current_state in [SELECT_INITIAL, SELECT_TARGET]:
         selected = context.user_data['initial'] if current_state == SELECT_INITIAL else context.user_data['target']
 
-        for effect in effects[start:end]:
+        for effect in effects[first:last]:
             emoji = "✅" if effect in selected else "⚪"
             keyboard.append([InlineKeyboardButton(f"{emoji} {effect}", callback_data=f"toggle_{effect}")])
 
@@ -121,7 +145,7 @@ class BotHandler:
         nav_buttons = []
         if page > 0:
             nav_buttons.append(InlineKeyboardButton("⬅️ Prev", callback_data="prev_page"))
-        if end < len(effects):
+        if last < len(effects):
             nav_buttons.append(InlineKeyboardButton("Next ➡️", callback_data="next_page"))
         if nav_buttons:
             keyboard.append(nav_buttons)
@@ -133,26 +157,6 @@ class BotHandler:
 
         return InlineKeyboardMarkup(keyboard)
 
-    def create_max_time_keyboard(self):
-        """Create keyboard for max_time selection"""
-        keyboard = [
-            [InlineKeyboardButton("3 seconds", callback_data="time_3")],
-            [InlineKeyboardButton("10 seconds", callback_data="time_10")],
-            [InlineKeyboardButton("30 seconds", callback_data="time_30")],
-            [InlineKeyboardButton("60 seconds", callback_data="time_60")]
-        ]
-        return InlineKeyboardMarkup(keyboard)
-
-    def create_budget_keyboard(self):
-        """Create keyboard for budget selection"""
-        keyboard = [
-            [InlineKeyboardButton("$5", callback_data="budget_5")],
-            [InlineKeyboardButton("$15", callback_data="budget_15")],
-            [InlineKeyboardButton("$50", callback_data="budget_50")],
-            [InlineKeyboardButton("$100", callback_data="budget_100")]
-        ]
-        return InlineKeyboardMarkup(keyboard)
-
     async def handle_interaction(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle all callbacks"""
         query = update.callback_query
@@ -161,7 +165,7 @@ class BotHandler:
 
         # Handle restart
         if data == "restart":
-            return await self.restart(update, context)
+            return await restart(update, context)
 
         # Handle mode selection
         if context.user_data.get('current_state') == SELECT_MODE:
@@ -175,7 +179,7 @@ class BotHandler:
                 context.user_data['current_state'] = SELECT_BUDGET
                 await query.edit_message_text(
                     "Select your budget limit:",
-                    reply_markup=self.create_budget_keyboard()
+                    reply_markup=create_budget_keyboard()
                 )
                 return SELECT_BUDGET
 
@@ -231,7 +235,7 @@ class BotHandler:
                     context.user_data['current_state'] = SELECT_MAX_TIME
                     await query.edit_message_text(
                         "Select maximum computation time:",
-                        reply_markup=self.create_max_time_keyboard()
+                        reply_markup=create_max_time_keyboard()
                     )
                     return SELECT_MAX_TIME
             else:  # current_state == SELECT_TARGET
@@ -305,8 +309,7 @@ class BotHandler:
             initial_state=frozenset(initial_effects) if initial_effects else frozenset({'Nothing'})
         )
 
-        response = ["💰 Result 💰"]
-        response.append(f"Budget: ${budget:.2f} | Computation time: {max_time}s")
+        response = ["💰 Result 💰", f"Budget: ${budget:.2f} | Computation time: {max_time}s"]
 
         if not solution['ingredients']:
             response.append("\n📋 No ingredients were used (initial effects only)")
@@ -332,7 +335,7 @@ class BotHandler:
     def get_handlers(self):
         return [
             ConversationHandler(
-                entry_points=[CommandHandler('start', self.start)],
+                entry_points=[CommandHandler('start', start)],
                 states={
                     SELECT_MODE: [CallbackQueryHandler(self.handle_interaction)],
                     SELECT_INITIAL: [CallbackQueryHandler(self.handle_interaction)],
@@ -344,13 +347,13 @@ class BotHandler:
                 map_to_parent={ConversationHandler.END: ConversationHandler.END},
                 allow_reentry=True
             ),
-            CallbackQueryHandler(self.restart, pattern="^restart$")
+            CallbackQueryHandler(restart, pattern="^restart$")
         ]
 
 
 def main():
-    token = ""
-    application = Application.builder().token().build()
+    my_token = ""
+    application = Application.builder().token(my_token).build()
     handler = BotHandler()
 
     application.add_handlers(handler.get_handlers())
